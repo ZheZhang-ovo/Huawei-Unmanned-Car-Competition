@@ -7,14 +7,14 @@ from bluetooth_bridge.msg import LaneMsg, Sensors
 import rospy
 from cap_init import CapInit
 import threading
-from lane_utils2 import laneDet
+from maindetection import laneDet
 
 
 slope_flag = 0 # 0表示平地，1表示下坡
 
 def main():
     rospy.init_node('lane_node', anonymous=True)
-    cap = CapInit()
+    cap, t = CapInit()
 
 
     print("[Lane Node]: Init")
@@ -40,20 +40,53 @@ def main():
     ros_spin.setDaemon(True)
     ros_spin.start()
 
-    while not rospy.is_shutdown():
-        ret, img = cap.read()
+    while True:
 
-        if ret:
-            bias, gear = laneDet.spin(img)
-            lane_pub.publish(LaneMsg(bias=bias, gear=gear))
-        else:
-            print("error")
+        # try:
+        _, bgr_img = cap.read()
+        if bgr_img is None:
+            break
+
+        bgr_img = cv2.resize(bgr_img, None, fx=0.5, fy=0.5)
+
+        result, bgr_img, offset, _, _ = laneDet.feedCap(bgr_img)
+        result = cv2.merge([result, result, result])
+        result = np.vstack([bgr_img, result])
+        cv2.imshow("sjb", result)
+        cv2.waitKey(t)
+        if cv2.getWindowProperty("sjb", cv2.WND_PROP_AUTOSIZE) < 1:
+            break
+
+    #cap.release()
+    while not rospy.is_shutdown():
+        # try:
+        _, bgr_img = cap.read()
+        if bgr_img is None:
+            break
+
+        bgr_img = cv2.resize(bgr_img, None, fx=0.5, fy=0.5)
+
+        gear = int (offset * 100) + 50
+        result, bgr_img, offset, _, _ = laneDet.feedCap(bgr_img)
+        gear = int (offset * 100) + 50
+        #result = cv2.merge([result, result, result])
+        #result = np.vstack([bgr_img, result])
+        #cv2.imshow("sjb", result)
+        cv2.waitKey(t)
+        if cv2.getWindowProperty("sjb", cv2.WND_PROP_AUTOSIZE) < 1:
+            break
+
+        #if _:
+            #bias, gear = laneDet.spin(bgr_img)
+        lane_pub.publish(LaneMsg(bias=0, gear=gear))
+        #else:
+            #print("error")
 
 
 if __name__ == '__main__':
     main()
 
-#!/usr/bin/python
+"""#!/usr/bin/python
 # -*- coding: utf-8 -*-
 from lane_utils import laneDetect
 import numpy as np
@@ -69,7 +102,7 @@ slope_flag = 0 # 0表示平地，1表示下坡
 
 def main():
     rospy.init_node('lane_node', anonymous=True)
-    cap = CapInit()
+    cap, t = CapInit()
 
     print("[Lane Node]: Init")
     # 车道线检测对象
@@ -101,4 +134,4 @@ def main():
             lane_pub.publish(LaneMsg(bias=bias, gear=gear))
 
 if __name__ == '__main__':
-    main()
+    main()"""

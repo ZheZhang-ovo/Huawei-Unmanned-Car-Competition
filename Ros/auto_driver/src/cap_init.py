@@ -2,13 +2,16 @@ import cv2
 
 def CapInit():
     cap = cv2.VideoCapture("/dev/video10")
+    fps = int(cap.get(5))
+    print('fps:', fps)
+    t = int(1000/fps)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
     cap.set(cv2.CAP_PROP_EXPOSURE, 0.04)
     cap.set(cv2.CAP_PROP_CONTRAST, 60)
     cap.set(cv2.CAP_PROP_SATURATION, 80)
-    return cap
+    return cap,t
 
 
 
