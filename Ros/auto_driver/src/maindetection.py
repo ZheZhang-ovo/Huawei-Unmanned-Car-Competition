@@ -180,7 +180,7 @@ class VehicleDetector():
 
         return binary_results, bgr_img, offset, PdeRoad_bool, 1
 
-LaneDet = VehicleDetector()
+laneDet = VehicleDetector()
 
 if __name__ == '__main__':
 
