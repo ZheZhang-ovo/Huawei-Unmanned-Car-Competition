@@ -29,7 +29,7 @@ class PedestrianEvent(DriverEvent):
     def is_start(self):
         width = 1280
         height = 720
-        flag, x_min, x_max, y_min, y_max, score = self.driver.get_objs(1)
+        flag, x_min, x_max, y_min, y_max, score = self.driver.get_objs(2)
         scale = (y_max - y_min) * (x_max - x_min) / (self.scale_prop * width * height)
         if flag & (score >= self.score_limit) & (scale >= 1) & (y_min >= self.y_limit * height):
             return True

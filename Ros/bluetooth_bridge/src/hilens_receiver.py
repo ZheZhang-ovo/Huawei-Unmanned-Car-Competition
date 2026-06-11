@@ -8,7 +8,7 @@ from npsocket import NumpySocket
 from bluetooth_bridge.msg import HilensMsg
 
 sock_receiver = NumpySocket()
-sock_receiver.initalize_receiver('192.168.2.1', 9999)
+sock_receiver.initalize_receiver('192.168.2.111', 7778)
 
 topic_hilens = '/hilens'
 

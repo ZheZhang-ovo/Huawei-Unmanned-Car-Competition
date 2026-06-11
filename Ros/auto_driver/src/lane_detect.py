@@ -22,7 +22,7 @@ def main():
 
     #--- subscribe topic
     def sensor_callback(msg):
-        """ 上下坡后重置 """
+        #""" 上下坡后重置 """
         global slope_flag
         theta = msg.thetax
         if theta < -1700 and slope_flag==0: # 检测到开始下坡

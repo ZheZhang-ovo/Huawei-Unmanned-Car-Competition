@@ -22,21 +22,21 @@ def main():
     # green_go_event = GreenGoEvent(driver, scale_prop=0.02, y_limit=0.7, speed=60, score_limit=0.3, go_time=2)
     # pedestrian_event = PedestrianEvent(driver, scale_prop=0.1, y_limit=0.5, score_limit=0.8,speed_normal=60,
     #                                    detect_time=10)
-    # speed_limited_event = SpeedLimitedEvent(driver, scale_prop=0.01, y_limit=0.8, speed_low=20, speed_normal=60,
+    # speed_limited_event = SpeedLimitedEvent(driver, scale_prop=0.01, y_limit=0.8, speed_low=15, speed_normal=60,
     #                                         score_limit=0.85, max_limited_time=5)
     # speed_minimum_event = SpeedMinimumEvent(driver, scale_prop=0.01, y_limit=0.8, speed_normal=60, speed_high=80,
     #                                         score_limit=0.85)
     # obstacle_event = ObstacleEvent(driver, speed_normal=60)
     # cross_bridge_event = CrossBridgeEvent(driver, imu_limit=300, speed_limit=80, speed_normal=60, speed_upper=80)
     # follow_lidar_event = FollowLidarEvent(driver)
-    # yellow_back_event = YellowBackEvent(driver, scale_prop=0.02, y_limit=0.7, speed=20, score_limit=0.4, range_limit=450,
-    #                                     turn_time=2, back_direction=35)
+    yellow_back_event = YellowBackEvent(driver, scale_prop=0.02, y_limit=0.7, score_limit=0.7)
     # start_end_event =
+    turn_left_event = TurnLeftPointEvent(driver,scale_prop=0.02,y_limit=0.7,score_limit=0.8)
+    turn_right_event = TurnRightPointEvent(driver,scale_prop=0.02,y_limit=0.7,score_limit=0.8)
 
 
-    # event_list = [obstacle_event, red_stop_event, yellow_back_event, pedestrian_event, cross_bridge_event,
-    #               follow_lidar_event, green_go_event, follow_lane_event, speed_limited_event,
-    #               speed_minimum_event]  # 默认为优先级排序，越靠前优先级越高
+    event_list = [obstacle_event, red_stop_event, yellow_back_event, pedestrian_event,turn_point_event,
+                  green_go_event,turn_left_event,turn_right_event, follow_lane_event, speed_limited_event]  # 默认为优先级排序，越靠前优先级越高
 
     event_list = [follow_lane_event]  # 默认为优先级排序，越靠前优先级越高
 

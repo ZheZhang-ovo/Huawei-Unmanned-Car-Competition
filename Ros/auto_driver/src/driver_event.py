@@ -245,7 +245,7 @@ class RedStopEvent(DriverEvent):
 
 class GreenGoEvent(DriverEvent):
     """
-    红灯策略
+    绿灯策略
     is_start: 目标检测到绿灯，四个条件需要同时满足：
              (1)box面积大于0.1w*0.1h
              (2)绿灯label的score>0.9
@@ -276,7 +276,7 @@ class GreenGoEvent(DriverEvent):
         width = 1280
         height = 720
         flag, x_min, y_min, x_max, y_max, score = self.driver.get_objs(0)
-        if flag and score > self.score_limit:
+        if flag == 0 and score > self.score_limit:
             area = (x_max - x_min) * (y_max - y_min)
             scale = area / (self.scale_prop * width * height)
             if scale >= 1 and y_max <= self.y_limit * height:
@@ -380,9 +380,9 @@ class SpeedLimitedEvent(DriverEvent):
     def is_start(self):
         width = 1280
         height = 720
-        flag, x_min, x_max, y_min, y_max, score = self.driver.get_objs(3)
+        flag, x_min, x_max, y_min, y_max, score = self.driver.get_objs(5)
         scale = (y_max - y_min) * (x_max - x_min) / (self.scale_prop * width * height)
-        if flag and (score >= self.score_limit) and (scale >= 1) and (y_min <= self.y_limit * height):
+        if flag == 5 and (score >= self.score_limit) and (scale >= 1) and (y_min <= self.y_limit * height):
             self.time = time.time()
             return True
         return False
@@ -390,9 +390,9 @@ class SpeedLimitedEvent(DriverEvent):
     def is_end(self):
         width = 1280
         height = 720
-        flag, x_min, x_max, y_min, y_max, score = self.driver.get_objs(5)
+        flag, x_min, x_max, y_min, y_max, score = self.driver.get_objs(6)
         scale = (y_max - y_min) * (x_max - x_min) / (self.scale_prop * width * height)
-        if flag and (score >= self.score_limit) and (scale >= 1) and (y_min <= self.y_limit * height):  # 识别到解除限速
+        if flag == 6 and (score >= self.score_limit) and (scale >= 1) and (y_min <= self.y_limit * height):  # 识别到解除限速
             self.driver.set_speed(self.speed_normal)
             return True
         elif (time.time() - self.time) >= self.max_limited_time:  # 超时
@@ -445,67 +445,54 @@ class SpeedMinimumEvent(DriverEvent):
 
 class YellowBackEvent(DriverEvent):
     '''
-    倒车策略
-    is_start: 目标检测到黄灯，四个条件需要同时满足：
+    红灯策略
+    is_start: 目标检测到红灯，四个条件需要同时满足：
              (1)box面积大于0.1w*0.1h
-             (2)黄灯label的score>0.9
-             (3)黄灯位于图片的上方，即y_max<0.2h
+             (2)红灯label的score>0.9
+             (3)红灯位于图片的上方，即y_max<0.2h
              (4)连续1个输出满足上述要求
-             档位调为R
-    is_end: 超声波距离过近
-    strategy: 先向左转弯再向右转弯再直线倒车，转弯事件待调
-    process: mode='N' ---> mode='R'&direction=direction&speed=speed ---> speed=0
+    is_end: is_start条件任意一个不满足则is_end，档位调为D
+    strategy: 直接刹车速度为0,速度小于2时档位调为P
+    process: None ---> speed=0&mode='N' ---> mode='D'
     '''
-    def __init__(self, driver, scale_prop, y_limit, speed, score_limit, range_limit, turn_time, back_direction):
-        super(YellowBackEvent,self).__init__(driver)
+    def __init__(self, driver, scale_prop, y_limit, score_limit=0.7):
+        """
+        初始化
+        :param area_thr: 检测红灯的面积阈值
+        :param score_thr: 检测红灯的置信度阈值
+        :param y_thr: 红灯高度阈值
+        """
+        super(YellowBackEvent, self).__init__(driver)
         self.scale_prop = scale_prop
         self.score_limit = score_limit
         self.y_limit = y_limit
-        self.speed = speed
-        self.range_limit = range_limit
-        self.turn_time = turn_time
-        self.back_direction = back_direction
-        self.phase = 1
-        self.time = time.time()
-
+        self.detect = 1
 
     def is_start(self):
+        """ 事件是否开始 """
         width = 1280
         height = 720
-        flag, x_min, x_max, y_min, y_max, score = self.driver.get_objs(6)
-        scale = (y_max - y_min) * (x_max - x_min) / (self.scale_prop * width * height)
-        if flag and (score >= self.score_limit) and (scale >= 1) and (y_min <= self.y_limit * height):
-            self.driver.set_mode('N')
-            self.time = time.time()
-            return True
+        flag, x_min, y_min, x_max, y_max, score = self.driver.get_objs(8)
+        if flag == 8 and score > self.score_limit:
+            area = (x_max - x_min) * (y_max - y_min)
+            scale = area / (self.scale_prop * width * height)
+            print("yellow scale", scale)
+            if scale >= 1 and y_max <= self.y_limit * height:
+                return True
         return False
 
     def is_end(self):
-        supersonic = self.driver.get_supersonic()
-        if supersonic < self.range_limit:
-            self.driver.set_speed(0)
-            self.driver.set_mode('P')
-            return True
-        return False
+        """ 事件是否终止 """
+        return not self.is_start()
 
     def strategy(self):
+        """ 控制策略 """
         self.driver.set_mode('R')
-        if self.phase == 1:
-            self.driver.set_speed(self.speed)
-            self.driver.set_direction(self.back_direction)
-            if time.time() - self.time >= 2:
-                self.phase = 2
-                self.time = time.time()
-        if self.phase == 2:
-            self.driver.set_speed(self.speed)
-            self.driver.set_direction(50 * 2 - self.back_direction)
-            if time.time() - self.time >= 2:
-                self.phase = 3
-                self.time = time.time()
-        if self.phase == 3:
-            self.driver.set_speed(self.speed)
-            self.driver.set_direction(50)
-        return True
+        self.driver.set_speed(10)
+        self.driver.set_direction(50)
+        time.sleep(5)
+        self.driver.set_mode('P')
+
 
 class BeginRunEvent(DriverEvent):
     """
@@ -616,3 +603,153 @@ class StartEndEvent(DriverEvent):
             if self.phase == 4:
                 self.driver.set_speed(self.speed)
                 self.driver.set_direction(50)
+
+class TurnLeftPointEvent(DriverEvent):
+    '''
+    转向策略
+    is_start: 目标检测到转向标志，四个条件需要同时满足:
+            (1)box面积大于0.15w*0.15h
+            (2)限速标志label的score>0.9
+            (3)限速标识位于图片的上方，即y_max<0.7h
+            (4)连续1个输出满足上述要求
+    is_end: 检测不到绿灯标志，开始巡线
+    strategy: （1）识别到”left“，方向调小于50（30？）
+              （2）识别到“right”，方向调大于50（55？）
+    process: None ---> speed=speed_low --->speed=speed_normal
+    '''
+    def __init__(self, driver, scale_prop, y_limit, score_limit=0.8):
+        super(SpeedLimitedEvent, self).__init__(driver)
+        self.scale_prop = scale_prop
+        self.score_limit = score_limit
+        self.y_limit = y_limit
+        self.time = time.time()
+
+    def is_start(self):
+        width = 1280
+        height = 720
+        flag, x_min, x_max, y_min, y_max, score = self.driver.get_objs(1)
+        scale = (y_max - y_min) * (x_max - x_min) / (self.scale_prop * width * height)
+        if flag == 1  and (score >= self.score_limit) and (scale >= 1) and (y_min <= self.y_limit * height):
+            self.time = time.time()
+            return True
+        return False
+
+    def is_end(self):
+        return not self.is_start()
+    '''    
+        width = 1280
+        height = 720
+        flag, x_min, x_max, y_min, y_max, score = self.driver.get_objs(1)
+        scale = (y_max - y_min) * (x_max - x_min) / (self.scale_prop * width * height)
+        if (score >= self.score_limit) and (scale >=0.005) and (y_min <= self.y_limit * height):  # 识别到左转向灯
+            self.driver.set_direction(50)
+            return True
+        elif (time.time() - self.time) >= self.max_limited_time:  # 超时
+            self.driver.set_direction(50)
+            return True
+        return False
+    '''
+    def strategy(self):
+        self.driver.set_direction(42)
+
+class TurnRightPointEvent(DriverEvent):
+    '''
+    转向策略
+    is_start: 目标检测到转向标志，四个条件需要同时满足:
+            (1)box面积大于0.15w*0.15h
+            (2)限速标志label的score>0.9
+            (3)限速标识位于图片的上方，即y_max<0.7h
+            (4)连续1个输出满足上述要求
+    is_end: 检测不到绿灯标志，开始巡线
+    strategy: （1）识别到”left“，方向调小于50（30？）
+              （2）识别到“right”，方向调大于50（55？）
+    process: None ---> speed=speed_low --->speed=speed_normal
+    '''
+    def __init__(self, driver, scale_prop, y_limit,  speed_normal,  score_limit=0.8):
+        super(SpeedLimitedEvent, self).__init__(driver)
+        self.scale_prop = scale_prop
+        self.score_limit = score_limit
+        self.y_limit = y_limit
+        self.time = time.time()
+
+    def is_start(self):
+        width = 1280
+        height = 720
+        flag, x_min, x_max, y_min, y_max, score = self.driver.get_objs(4)
+        scale = (y_max - y_min) * (x_max - x_min) / (self.scale_prop * width * height)
+        if flag == 1  and (score >= self.score_limit) and (scale >= 1) and (y_min <= self.y_limit * height):
+            self.time = time.time()
+            return True
+        return False
+
+    def is_end(self):
+        return not self.is_start()
+    '''    
+        width = 1280
+        height = 720
+        flag, x_min, x_max, y_min, y_max, score = self.driver.get_objs(4)
+        scale = (y_max - y_min) * (x_max - x_min) / (self.scale_prop * width * height)
+        if (score >= self.score_limit) and (scale >=0.005) and (y_min <= self.y_limit * height):  # 识别到左转向灯
+            self.driver.set_direction(50)
+            return True
+        elif (time.time() - self.time) >= self.max_limited_time:  # 超时
+            self.driver.set_direction(50)
+            return True
+        return False
+    '''
+    def strategy(self):
+        self.driver.set_direction(55)
+
+class RobotEvent(DriverEvent):
+    '''
+    斑马线策略
+    is_start: 目标检测到斑马线，四个条件需要同时满足：
+             (1)box面积大于0.4w*0.15h
+             (2)斑马线label的score>0.9
+             (3)斑马线位于图片的下方，即y_min>0.6h
+             (4)连续1个输出满足上述要求
+             (5)与上次遇到斑马线时间超过10s
+    is_end: is_start条件任意一个不满足则is_end
+    strategy: 直接刹车速度为0
+    process: None ---> speed=0&mode='N' ---> mode='D',speed=speed
+    '''
+    def __init__(self, driver, scale_prop, y_limit, speed_normal, detect_time = 10, score_limit=0.5):
+        super(PedestrianEvent, self).__init__(driver)
+        self.scale_prop = scale_prop
+        self.score_limit = score_limit
+        self.y_limit = y_limit
+        self.speed_normal = speed_normal
+        self.detect_time = detect_time
+        self.time = time.time()
+        self.detect = 1
+
+    def is_start(self):
+        if self.detect:
+            width = 1280
+            height = 720
+            flag, x_min, x_max, y_min, y_max, score = self.driver.get_objs(2)
+            flag2, x_min2, x_max2, y_min2, y_max2, score2 = self.driver.get_objs(5)
+            scale = (y_max - y_min) * (x_max - x_min) / (self.scale_prop * width * height)
+            if flag == 2 and (score >= self.score_limit) and (scale >= 1) and (y_min >= self.y_limit * height) and flag2 == 5:
+                self.time = time.time()
+                self.detect = 0
+                return True
+        else:
+            time_interval = time.time() - self.time
+            if time_interval >= self.detect_time:
+                self.detect = 1
+        return False
+
+    def is_end(self):
+
+        if self.driver.get_speed() == 0:
+            self.driver.set_mode('D')
+            self.driver.set_speed(self.speed_normal)
+            return True
+        return False
+
+    def strategy(self):
+        self.driver.set_speed(0)
+        time.sleep(10)
+        #if self.driver.get_speed() <= 2:
+        #    self.driver.set_mode('N')
